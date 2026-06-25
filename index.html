@@ -142,6 +142,9 @@ table.rank td.nm{font-weight:500}
 .flags.ok{color:var(--good);font-size:12.5px}
 input#desaSearch{width:100%;font-family:inherit;font-size:14px;padding:11px 13px;border:1px solid var(--line2);border-radius:10px;color:var(--ink)}
 input#desaSearch:focus{outline:2px solid var(--brand)}
+.mbtn{cursor:pointer;font-family:inherit;text-align:left;width:100%;border:1px solid var(--line)}
+.mbtn:hover{border-color:var(--line2)}
+.mbtn.sel{outline:2px solid var(--brand);outline-offset:-1px}
 </style>
 </head>
 <body>
@@ -196,6 +199,7 @@ const ICONS={
   rank:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>',
   trend:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>',
   database:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   chev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>'
 };
 const NAV=[
@@ -204,6 +208,7 @@ const NAV=[
   {id:'prioritas',label:'Program Prioritas',icon:'star',title:'Program prioritas'},
   {id:'thk',label:'Tri Hita Karana',icon:'layers',title:'Tri Hita Karana',sub:[{id:'Parahyangan',label:'Parahyangan'},{id:'Pawongan',label:'Pawongan'},{id:'Palemahan',label:'Palemahan'}]},
   {id:'pencairan',label:'Pencairan & LPJ',icon:'flow',title:'Pencairan & LPJ'},
+  {id:'statuspen',label:'Status Pencairan',icon:'check',title:'Status pencairan per desa'},
   {id:'profil',label:'Profil Desa Adat',icon:'user',title:'Profil desa adat'},
   {id:'kepatuhan',label:'Kepatuhan',icon:'bell',title:'Catatan kepatuhan'},
   {id:'tren',label:'Tren Tahunan',icon:'trend',title:'Tren tahunan'},
@@ -211,7 +216,7 @@ const NAV=[
 ];
 
 let DESA=[],KAT=[],COMPLY=[],PEN=[],LPJ=[],PENG=[],LK={},charts={};
-const state={year:null,sumber:'all',kab:'',kec:'',desa:null,view:'ringkasan',geoLevel:'kab',katFocus:'Parahyangan'};
+const state={year:null,sumber:'all',kab:'',kec:'',desa:null,view:'ringkasan',geoLevel:'kab',katFocus:'Parahyangan',penCat:'belum'};
 
 const idn=new Intl.NumberFormat('id-ID');
 const fmtRp=n=>'Rp '+idn.format(Math.round(n));
@@ -355,6 +360,31 @@ function viewPencairan(){
     <div><div class="card"><h3>Ketepatan waktu LPJ</h3><p class="csub">${yr}</p><div class="cwrap" style="height:200px"><canvas id="cLpj"></canvas></div></div></div></div>`;
   bar('cTahap',['Tahap 1','Tahap 2','Tahap 3'],byTahap.map(x=>x.nilai),[C.brand,C.pawo,C.pale],{money:true});
   donut('cLpj',['Tepat waktu','Terlambat'],[tepat,lambat],[C.good,C.bad]);}
+function penStatusRows(){const y=state.year;const pen={};
+  PEN.filter(p=>p.th===y).forEach(p=>{const o=pen[p.d]||(pen[p.d]={t:new Set(),total:0});o.t.add(p.tahap);o.total+=p.nilai;});
+  return DESA.filter(o=>inScope(o.i)&&(!o.aktif||o.aktif<=y)).map(o=>{const pd=pen[o.i];const t=pd?pd.t:new Set();
+    return {o,n:t.size,total:pd?pd.total:0,t1:t.has(1),t2:t.has(2),t3:t.has(3)};});}
+function setPenCat(c){state.penCat=c;render();}
+function viewStatusPencairan(){const rows=penStatusRows();const cnt=[0,0,0,0];rows.forEach(r=>cnt[r.n]++);
+  const ongoing=state.year===Math.max.apply(null,LK.allYears);
+  const labelN={0:'Tidak menerima',1:'1 tahap (≈Rp 100 jt)',2:'2 tahap (≈Rp 200 jt)',3:'Lengkap 3 tahap (≈Rp 300 jt)'};
+  const cat=state.penCat||'belum';
+  const card=(c,col,t,v)=>`<button class="metric mbtn ${cat===c?'sel':''}" onclick="setPenCat('${c}')"><div class="ic" style="background:${col}22;color:${col}">${ICONS.check}</div><div class="k">${t}</div><div class="v num">${idn.format(v)} <span style="font-size:13px;color:var(--ink2)">desa</span></div></button>`;
+  let sel=cat==='belum'?rows.filter(r=>r.n<3):cat==='all'?rows:rows.filter(r=>r.n===+cat);
+  sel=sel.sort((a,b)=>a.n-b.n||a.o.kab.localeCompare(b.o.kab)||a.o.kec.localeCompare(b.o.kec));
+  const cap=sel.slice(0,500);const chk=b=>b?`<span style="color:${C.good};font-weight:700">✓</span>`:`<span style="color:var(--ink3)">—</span>`;
+  const body=cap.map(r=>`<tr><td class="nm">${r.o.desa}</td><td>${r.o.kec}</td><td>${kabShort(r.o.kab)}</td><td style="text-align:center">${chk(r.t1)}</td><td style="text-align:center">${chk(r.t2)}</td><td style="text-align:center">${chk(r.t3)}</td><td class="r num">${fmtShort(r.total)}</td><td><span class="pill ${r.n===3?'g':r.n===0?'b':'w'}">${labelN[r.n]}</span></td></tr>`).join('');
+  document.getElementById('content').innerHTML=heroHTML()+
+    `<div class="notice info"><span class="nico">${ICONS.check}</span><div>Pagu per desa adat <b>Rp 300 juta</b> dalam 3 tahap (@Rp 100 juta). Anggaran <b>Rp 0</b> berarti tidak mengajukan / belum memenuhi syarat.${ongoing?' Tahun '+state.year+' masih berjalan, sehingga pencairan sebagian (1–2 tahap) wajar.':''}</div></div>
+     <div class="metrics">
+      ${card('3',C.good,'Lengkap · Rp 300 jt',cnt[3])}
+      ${card('2',C.warn,'2 tahap · Rp 200 jt',cnt[2])}
+      ${card('1',C.warn,'1 tahap · Rp 100 jt',cnt[1])}
+      ${card('0',C.bad,'Tidak menerima · Rp 0',cnt[0])}
+     </div>
+     <div class="card"><div class="ctop"><h3>Daftar desa — ${cat==='belum'?'belum lengkap (0–2 tahap)':cat==='all'?'semua desa':labelN[+cat]}</h3><button class="lnk" onclick="setPenCat('${cat==='all'?'belum':'all'}')">${cat==='all'?'tampilkan yang belum lengkap':'tampilkan semua'}</button></div>
+     <p class="csub">${sel.length} desa pada cakupan ${state.year}${sel.length>500?' (menampilkan 500 pertama)':''} · klik kartu di atas untuk menyaring</p>
+     <div style="overflow-x:auto"><table class="rank"><thead><tr><th>Desa adat</th><th>Kecamatan</th><th>Kabupaten</th><th style="text-align:center">T1</th><th style="text-align:center">T2</th><th style="text-align:center">T3</th><th class="r">Total cair</th><th>Status</th></tr></thead><tbody>${body||'<tr><td colspan="8" class="hint">Tidak ada desa pada kategori ini.</td></tr>'}</tbody></table></div></div>`;}
 function viewProfil(){
   if(state.desa==null){document.getElementById('content').innerHTML=profilPicker()+`<div class="card"><div class="hint">Pilih satu desa adat di atas untuk melihat rapor keuangannya lintas tahun.</div></div>`;wireDesaPick();return;}
   const o=DESA[state.desa];
@@ -437,7 +467,7 @@ function syncSelects(){fillSelect(document.getElementById('fy'),LK.allYears.map(
   const kec=state.kab?[...new Set(DESA.filter(o=>o.kab===state.kab).map(o=>o.kec))].sort():[...new Set(DESA.map(o=>o.kec))].sort();
   fillSelect(document.getElementById('fkec'),[{v:'',t:'Semua kecamatan'}].concat(kec.map(k=>({v:k,t:k}))),state.kec);}
 function render(){destroyAll();renderNav();const ni=NAV.find(n=>n.id===state.view)||NAV[0];document.getElementById('pageTitle').textContent=ni.title;
-  ({ringkasan:viewRingkasan,wilayah:viewWilayah,prioritas:viewPrioritas,thk:viewTHK,pencairan:viewPencairan,profil:viewProfil,kepatuhan:viewKepatuhan,tren:viewTren,sumber:viewSumber}[state.view]||viewRingkasan)();}
+  ({ringkasan:viewRingkasan,wilayah:viewWilayah,prioritas:viewPrioritas,thk:viewTHK,pencairan:viewPencairan,statuspen:viewStatusPencairan,profil:viewProfil,kepatuhan:viewKepatuhan,tren:viewTren,sumber:viewSumber}[state.view]||viewRingkasan)();}
 function wire(){document.getElementById('fy').onchange=e=>{state.year=+e.target.value;render();};
   document.getElementById('fsumber').onchange=e=>{state.sumber=e.target.value;render();};
   document.getElementById('fkab').onchange=e=>{state.kab=e.target.value;state.kec='';syncSelects();render();};
