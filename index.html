@@ -177,7 +177,9 @@ input#desaSearch:focus{outline:2px solid var(--brand)}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 /* ============ KONFIGURASI (isi URL publish-to-web CSV tiap tab utk data live) ============ */
-const CONFIG = { sheets:{ REALISASI:"", PENCAIRAN:"", LPJ:"", PENGHARGAAN:"", REF_DESA:"" } };
+/* Tempel URL "Publish to web > CSV" tiap tab ringkasan di sini untuk data live.
+   Kosongkan semua untuk memakai data contoh bawaan. */
+const CONFIG = { sheets:{ REF:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRsQcRrhzcXr42zG_4VDm6vvcYCV7eeZnJHXlxXbGWlyYHxjWUlI0vL-Z0rilDEzhkUp6Ln2SgYVNxX/pub?gid=415381510&single=true&output=csv", KAT:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRsQcRrhzcXr42zG_4VDm6vvcYCV7eeZnJHXlxXbGWlyYHxjWUlI0vL-Z0rilDEzhkUp6Ln2SgYVNxX/pub?gid=2056634204&single=true&output=csv", COMPLY:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRsQcRrhzcXr42zG_4VDm6vvcYCV7eeZnJHXlxXbGWlyYHxjWUlI0vL-Z0rilDEzhkUp6Ln2SgYVNxX/pub?gid=1906646235&single=true&output=csv", PEN:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRsQcRrhzcXr42zG_4VDm6vvcYCV7eeZnJHXlxXbGWlyYHxjWUlI0vL-Z0rilDEzhkUp6Ln2SgYVNxX/pub?gid=1828588354&single=true&output=csv", LPJ:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRsQcRrhzcXr42zG_4VDm6vvcYCV7eeZnJHXlxXbGWlyYHxjWUlI0vL-Z0rilDEzhkUp6Ln2SgYVNxX/pub?gid=1085912089&single=true&output=csv", PENG:"https://docs.google.com/spreadsheets/d/e/2PACX-1vRsQcRrhzcXr42zG_4VDm6vvcYCV7eeZnJHXlxXbGWlyYHxjWUlI0vL-Z0rilDEzhkUp6Ln2SgYVNxX/pub?gid=839230090&single=true&output=csv" } };
 
 const C={brand:'#1A7A4F',deep:'#0E5E45',good:'#2E8B57',warn:'#C58A1B',bad:'#C0492F',line:'#E3E8E1',ink:'#16231C',ink2:'#5C6660',
   para:'#B5862B',pawo:'#1F6F8B',pale:'#4E7A2A',oper:'#7A7E78'};
@@ -442,7 +444,36 @@ function wire(){document.getElementById('fy').onchange=e=>{state.year=+e.target.
   document.getElementById('fkab').onchange=e=>{state.kab=e.target.value;state.kec='';syncSelects();render();};
   document.getElementById('fkec').onchange=e=>{state.kec=e.target.value;render();};}
 function start(){state.year=LK.years[LK.years.length-1];syncSelects();wire();render();}
-function init(){decodeBaked(window.BAKED);document.getElementById('datalbl').textContent='Data contoh (Hibah+SILPA)';start();}
+function staticMeta(){const B=window.BAKED;return {cats:B.cats,prio_codes:B.prio_codes,prio_label:B.prio_label,rules:B.rules};}
+function papaGet(url){return new Promise((res,rej)=>Papa.parse(url,{download:true,header:true,skipEmptyLines:true,complete:r=>res(r.data),error:rej}));}
+const _num=v=>{const n=parseInt(String(v==null?'':v).replace(/[^0-9-]/g,''));return isNaN(n)?0:n;};
+async function buildFromSheets(u){
+  const [ref,kat,comply,pen,lpj,peng]=await Promise.all([papaGet(u.REF),papaGet(u.KAT),papaGet(u.COMPLY),papaGet(u.PEN),papaGet(u.LPJ),papaGet(u.PENG)]);
+  const M=staticMeta();
+  const desas=[...new Set(ref.map(r=>_num(r.KODE_DA)).filter(Boolean))].sort((a,b)=>a-b);
+  const di={}; desas.forEach((k,i)=>di[k]=i);
+  const info={}; ref.forEach(r=>{const k=_num(r.KODE_DA);if(!k)return;info[k]={kab:(r.KABUPATEN||'').trim(),kec:(r.KECAMATAN||'').trim(),desa:(r.DESA_ADAT||'').trim(),aktif:_num(r.AKTIF_SEJAK),kda:k};});
+  DESA=desas.map((k,i)=>({...info[k],i}));
+  const kabs=[...new Set(Object.values(info).map(o=>o.kab).filter(Boolean))].sort();
+  KAT=kat.map(r=>({d:di[_num(r.KODE_DA)],th:_num(r.TAHUN),sm:((r.SUMBER||'').trim()==='Hibah'?0:1),kat:(r.KATEGORI||'').trim(),A:_num(r.ANGGARAN),R:_num(r.REALISASI)})).filter(r=>r.d!=null);
+  const n=M.prio_codes.length;
+  COMPLY=comply.map(r=>{const pA=[],pR=[];for(let i=1;i<=n;i++){const k=String(i).padStart(2,'0');pA.push(_num(r['PA'+k]));pR.push(_num(r['PR'+k]));}
+    return {d:di[_num(r.KODE_DA)],th:_num(r.TAHUN),ban:_num(r.INS_BANDESA),pra:_num(r.INS_PRAJURU),staf:_num(r.INS_STAF),bpjs:_num(r.BPJS),pA,pR};}).filter(r=>r.d!=null);
+  PEN=pen.map(r=>({d:di[_num(r.KODE_DA)],th:_num(r.TAHUN),tahap:_num(r.TAHAP),nilai:_num(r.NILAI),tgl:(r.TGL_SP2D||'').trim(),no:(r.NO_SP2D||'').trim()})).filter(r=>r.d!=null);
+  LPJ=lpj.map(r=>({d:di[_num(r.KODE_DA)],th:_num(r.TAHUN),tgl:(r.TGL_PENYAMPAIAN||'').trim(),status:(r.STATUS||'').trim()})).filter(r=>r.d!=null);
+  PENG=peng.map(r=>({d:di[_num(r.KODE_DA)],th:_num(r.TAHUN),txt:(r.PENGHARGAAN||'').trim()})).filter(r=>r.d!=null);
+  const years=[...new Set(KAT.map(r=>r.th))].sort();const allY=new Set(years);PEN.forEach(p=>allY.add(p.th));
+  if(!DESA.length||!KAT.length)throw new Error('data live kosong');
+  LK={kab:kabs,cats:M.cats,prio_codes:M.prio_codes,prio_label:M.prio_label,years,rules:M.rules,allYears:[...allY].sort()};
+}
+function init(){
+  const u=CONFIG.sheets;const ready=['REF','KAT','COMPLY','PEN','LPJ','PENG'].every(k=>u[k]);
+  if(ready){
+    document.getElementById('datalbl').textContent='Memuat dari Sheets…';
+    buildFromSheets(u).then(()=>{document.getElementById('datadot').classList.add('live');document.getElementById('datalbl').textContent='Data langsung · Sheets';start();})
+      .catch(e=>{console.error(e);decodeBaked(window.BAKED);document.getElementById('datalbl').textContent='Data contoh (Sheets gagal)';start();});
+  }else{decodeBaked(window.BAKED);document.getElementById('datalbl').textContent='Data contoh (Hibah+SILPA)';start();}
+}
 init();
 
 </script>
