@@ -297,9 +297,8 @@ function drawTrend(cid,sId){const yrs=trendYears();const pts=yrs.map(y=>{const g
 
 /* ===== compliance ===== */
 function complyFlags(r){const R=LK.rules;const ins=r.ban+r.pra+r.staf;const out=[];
-  if(ins!==R.insentif_total) out.push({rule:'insentif',msg:`Insentif Rp ${idn.format(ins)} (standar Rp ${idn.format(R.insentif_total)})`});
-  if(r.ban!==R.bandesa && r.ban>0) out.push({rule:'bandesa',msg:`Insentif Bandesa Rp ${idn.format(r.ban)} (standar Rp ${idn.format(R.bandesa)})`});
-  if(r.bpjs>R.bpjs_max) out.push({rule:'bpjs',msg:`BPJS Rp ${idn.format(r.bpjs)} (maks Rp ${idn.format(R.bpjs_max)})`});
+  if(ins>R.insentif_total) out.push({rule:'insentif',msg:`Insentif Rp ${idn.format(ins)} melebihi maks Rp ${idn.format(R.insentif_total)}`});
+  if(r.bpjs>R.bpjs_max) out.push({rule:'bpjs',msg:`BPJS Rp ${idn.format(r.bpjs)} melebihi maks Rp ${idn.format(R.bpjs_max)}`});
   const miss=r.pA.filter(v=>v<=0).length; if(miss>0) out.push({rule:'prio',msg:`${miss} program prioritas belum dianggarkan`});
   return out;}
 function complySummary(){const rows=complyRows();let ins=0,bpjs=0,prio=0,tot=rows.length;const list=[];
@@ -389,10 +388,10 @@ function viewKepatuhan(){const cs=complySummary();const R=LK.rules;
   const card=(col,ic,t,v,sub)=>`<div class="metric"><div class="ic" style="background:${col}22;color:${col}">${ICONS[ic]}</div><div class="k">${t}</div><div class="v num">${v}</div><div class="hint">${sub}</div></div>`;
   let rowsH=cs.list.slice(0,200).map(it=>{const o=DESA[it.d];return `<tr><td class="nm">${o.desa}</td><td>${o.kec}</td><td>${kabShort(o.kab)}</td><td>${it.flags.map(f=>`<span class="flag">${f.msg}</span>`).join(' ')}</td></tr>`;}).join('');
   document.getElementById('content').innerHTML=heroHTML()+
-    `<div class="notice info"><span class="nico">${ICONS.bell}</span><div>Aturan yang dipantau: total insentif <b>Rp ${idn.format(R.insentif_total)}</b> (Bandesa Rp ${idn.format(R.bandesa)} + Prajuru/Staf Rp ${idn.format(R.lain)}); iuran BPJS Ketenagakerjaan maks <b>Rp ${idn.format(R.bpjs_max)}</b>; serta <b>11 program prioritas wajib dianggarkan</b>.</div></div>
+    `<div class="notice info"><span class="nico">${ICONS.bell}</span><div>Aturan yang dipantau: total insentif maksimal <b>Rp ${idn.format(R.insentif_total)}</b>; iuran BPJS Ketenagakerjaan maksimal <b>Rp ${idn.format(R.bpjs_max)}</b>; serta <b>11 program prioritas wajib dianggarkan</b> (realisasi sebagai kinerja).</div></div>
      <div class="metrics">
       ${card(C.good,'trend','Desa memenuhi aturan',idn.format(cs.patuh),`dari ${idn.format(cs.tot)} desa`)}
-      ${card(C.warn,'wallet','Catatan insentif',idn.format(cs.ins),'insentif ≠ standar')}
+      ${card(C.warn,'wallet','Catatan insentif',idn.format(cs.ins),'melebihi Rp 83 jt')}
       ${card(C.bad,'bell','Catatan BPJS',idn.format(cs.bpjs),'melebihi Rp 604.800')}
       ${card(C.pawo,'star','Prioritas belum lengkap',idn.format(cs.prio),'ada prioritas tak dianggarkan')}
      </div>
